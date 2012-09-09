@@ -2,20 +2,16 @@
 
 require File.join(File.dirname(__FILE__),"todo.rb")
 
-if ARGV.empty?
-  project_tasks = []
-  @list.projects.each do |project|
-    puts project.yellow
-    @list.project_tasks(project).each do |t|
-      print "  "
-      t.print
-      project_tasks << t
-    end
+def print_project project
+  project ? puts(yellow(project)) : puts(yellow("--"))
+  @list.select{|t| t[:project] == project}.each do |t|
+    t.print @list
+    #puts "  #{@list.index(t)} #{t[:description]}"
   end
-  puts "not assigned".yellow
-  (@list - Todo::List.new(project_tasks)).each{|t| print "  "; t.print}
+end
 
+if ARGV.empty?
+  @list.collect{|t| t[:project]}.uniq.each { |project| print_project project }
 else
-  puts ARGV.first
-  @list.project_tasks(ARGV.first).each{|t| print "  "; t.print}
+  print_project ARGV.first
 end

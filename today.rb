@@ -2,9 +2,6 @@
 
 require File.join(File.dirname(__FILE__),"todo.rb")
 
-@list.overdue.each{|t| t.print}
-@list.today.each{|t| t.print}
-@list.scheduled.each do |t|
-  print "#{(t.date - Date.today).to_i.to_s.rjust(3)} days: "
-  t.print
-end
+@list.select{|t| t.overdue?}.sort{|a,b| a.date_diff <=> b.date_diff}.each{|t| t.print @list}
+@list.select{|t| t.today?}.sort{|a,b| a.date_diff <=> b.date_diff}.each{|t| t.print @list}
+@list.select{|t| t.scheduled?}.sort{|a,b| a.date_diff <=> b.date_diff}.each{|t| t.print @list}
