@@ -3,14 +3,15 @@
 require File.join(File.dirname(__FILE__),"todo.rb")
 
 if ARGV.empty?
-  `xterm -e vim #{Todo::TODO}`
+  `xterm -e vim #{TODO}`
 elsif ARGV.first =~ /\d+/
-  task = @list[ARGV.last.to_i-1]
-  tmpfile = File.join(Todo::TODO_DIR,"tmp.txt")
-  File.open(tmpfile, "w+"){|f| f.puts task.orig}
+  task = @list[ARGV.last.to_i]
+  tmpfile = File.join(TODO_DIR,"tmp.txt")
+  File.open(tmpfile, "w+"){|f| f.puts task.to_yaml}
   `xterm -e vim #{tmpfile}`
-  @list[ARGV.last.to_i-1] = Todo::Task.new File.new(tmpfile).read
-  @list.save
+  @list[ARGV.last.to_i] = YAML.load_file tmpfile
+  File.open(TODO,"w+"){|f| f.puts @list.to_yaml}
+=begin
 else # edit project
   tasks =  @list.select{ |t| t.projects.include? ARGV.first.strip }
   @list -= tasks
@@ -19,4 +20,5 @@ else # edit project
   `xterm -e vim #{tmpfile}`
   File.read(tmpfile).each_line{ |line| @list.push Todo::Task.new(line.chomp) }
   @list.save
+=end
 end
