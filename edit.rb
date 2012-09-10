@@ -10,7 +10,7 @@ elsif ARGV.first =~ /\d+/
   File.open(tmpfile, "w+"){|f| f.puts task.to_yaml}
   `xterm -e vim #{tmpfile}`
   @list[ARGV.last.to_i] = YAML.load_file tmpfile
-  File.open(TODO,"w+"){|f| f.puts @list.to_yaml}
+  save
 =begin
 else # edit project
   tasks =  @list.select{ |t| t.projects.include? ARGV.first.strip }

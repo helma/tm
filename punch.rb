@@ -12,5 +12,5 @@ elsif ARGV.size == 2 # add duration
   task = @list[ARGV.first.to_i]
   task[:offline] ||= []
   task[:offline] << ARGV.last.to_f
-  save
 end
+save
