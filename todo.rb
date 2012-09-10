@@ -36,6 +36,13 @@ def current
   @list.select{|t| t[:description] == description.chomp}.first
 end
 
+def save
+  File.open(TODO,"w+"){|f| f.puts @list.to_yaml} if @list and !@list.empty?
+  File.open(DONE,"w+"){|f| f.puts @done.to_yaml} if @done and !@done.empty?
+  File.open(DELETED,"w+"){|f| f.puts @deleted.to_yaml} if @deleted and !@deleted.empty?
+  `git commit -am "#{Time.now}"`
+end
+
 class Hash
 
   def overdue?
@@ -69,7 +76,6 @@ class Hash
   end
 
   def print list
-
     str = "#{"%02d" % list.index(self)}  #{self[:description]}"
     str += " (#{self.date_diff} days) " if self.scheduled?
     str += " (#{self.dur.to_m} min)" if self.dur
@@ -81,14 +87,14 @@ class Hash
   def punchout
     self[:punch].last << Time.now
     File.open(CURRENT,"w+"){|f| f.print ""}
-    File.open(TODO,"w+"){|f| f.puts @list.to_yaml}
+    save
   end
 
   def punchin 
     self[:punch] ||= []
     self[:punch] << [Time.now]
     File.open(CURRENT,"w+"){|f| f.print self[:description]}
-    File.open(TODO,"w+"){|f| f.puts @list.to_yaml}
+    save
   end
 
   def done
@@ -97,8 +103,7 @@ class Hash
     self[:finished] = Date.today
     @done << task
     @list.delete self
-    File.open(DONE,"a+"){|f| f.puts @done.to_yaml}
-    File.open(TODO,"w+"){|f| f.puts @list.to_yaml}
+    save
   end
 
 end

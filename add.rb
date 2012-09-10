@@ -17,6 +17,6 @@ annotations.each do |a|
   task[k.to_sym] = v
 end if annotations
 @list << task
-File.open(TODO,"w+"){|f| f.puts @list.to_yaml}
+save
 print "Added: "
 task.print @list
