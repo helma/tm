@@ -5,11 +5,12 @@ SHORTCUTS = {
   :e => :edit,
   :l => :ls,
   :p => :punch,
-  :s => :schedule,
   :d => :done,
-  :D => :delete,
+  :x => :delete,
   :t => :today,
   :c => :current,
+  :pri => :priority,
+  :dep => :dependencies,
   :A => :add_punch
 }
 
@@ -22,8 +23,12 @@ if ARGV.empty?
 else
   case ARGV.first
   when /^\d+$/
-    run :punch
-  when /^\w$/ 
+    if ARGV.size == 1
+      run :punch
+    else
+      run "modify"
+    end
+  when /^\w+$/ 
     action = ARGV.shift.to_sym
     run SHORTCUTS[action]
   else

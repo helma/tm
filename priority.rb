@@ -1,9 +1,8 @@
 #!/usr/bin/env ruby
 
 require File.join(File.dirname(__FILE__),"todo.rb")
-task = {}
-task.parse ARGV
-@list << task
+task = @list.delete_at ARGV.first.to_i
+@list.insert ARGV.last.to_i, task
 save
-print "Added: "
+print "moved: "
 task.print @list

@@ -98,5 +98,48 @@ class Hash
     File.open(CURRENT,"w+"){|f| f.print self[:description]}
   end
 
+  def parse args
+    shortcuts = {
+      :e => :expected_duration,
+      :s => :scheduled,
+      :d => :due,
+      :p => :pri
+    }
+    project = args.grep(/^\+/)
+    args -= project
+    #billing = args.grep(/^\$/)
+    #puts billing
+    #args -= billing
+    context = args.grep(/^@/)
+    args -= context
+    annotations = args.grep(/^\w+:/)
+    args -= annotations
+    self[:added] = Date.today if self.empty?
+    self[:description] = args.join(" ") unless args.empty?
+    self[:project] = project.first.sub(/^\+/,'') unless project.empty?
+    #self[:billing] = billing.first.sub(/^\$/,'') unless billing.empty?
+    self[:context] = context.first.sub(/^@/,'') unless context.empty?
+    annotations.each do |a|
+      k,v = a.split ':'
+      k = shortcuts[k.to_sym] if shortcuts.keys.include? k.to_sym
+      case k.to_s
+      when /scheduled|due/
+        case v.to_s
+        when /\d{4}-\d{2}-\d{2}/
+          v = Date.parse v
+        when /\d+/
+          v = Date.today + v.to_i
+        when ""
+          v = Date.today
+        end
+      when "expected_duration"
+        v = v.to_i * 60
+      when "dep"
+      when "pri"
+      end
+      self[k.to_sym] = v
+    end if annotations
+  end
+
 end
 
