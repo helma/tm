@@ -2,16 +2,18 @@
 
 require File.join(File.dirname(__FILE__),"todo.rb")
 
-def print_project project
-  project ? puts(yellow(project)) : puts(yellow("--"))
-  @list.select{|t| t[:project] == project}.each do |t|
-    t.print @list
-    #puts "  #{@list.index(t)} #{t[:description]}"
+def print_tag tag
+  puts(yellow(tag))
+  if tag == "-"
+    @list.select{|t| t[:tags].empty? }.each { |t| t.print @list } 
+  else
+    @list.select{|t| t[:tags].include? tag}.each { |t| t.print @list } 
   end
 end
 
 if ARGV.empty?
-  @list.collect{|t| t[:project]}.uniq.each { |project| print_project project }
+  @list.collect{|t| t[:tags]}.flatten.uniq.sort.each { |tag| print_tag tag }
+  print_tag "-"
 else
-  print_project ARGV.first
+  print_tag ARGV.first
 end

@@ -1,6 +1,11 @@
 #!/usr/bin/env ruby
 
 require File.join(File.dirname(__FILE__),"todo.rb")
-line = @list.size+1
-run "add"
-run "punch"
+line = @list.size
+task = {}
+task.parse ARGV
+@list << task
+save
+`punch.rb #{line}`
+print "Added: "
+task.print @list

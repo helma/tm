@@ -11,14 +11,4 @@ elsif ARGV.first =~ /\d+/
   `xterm -e vim #{tmpfile}`
   @list[ARGV.last.to_i] = YAML.load_file tmpfile
   save
-=begin
-else # edit project
-  tasks =  @list.select{ |t| t.projects.include? ARGV.first.strip }
-  @list -= tasks
-  tmpfile = File.join(Todo::TODO_DIR,"tmp.txt")
-  File.open(tmpfile, "w+"){|f| f.puts tasks.collect{|t| t.orig}}
-  `xterm -e vim #{tmpfile}`
-  File.read(tmpfile).each_line{ |line| @list.push Todo::Task.new(line.chomp) }
-  @list.save
-=end
 end

@@ -2,7 +2,6 @@
 require 'github_api'
 require "rest-client"
 require 'json'
-#require 'yaml'
 require File.join(File.dirname(__FILE__),"todo.rb")
 
 def parse uri
@@ -12,11 +11,13 @@ rescue
 end
 
 parse("https://api.github.com/users/opentox/repos").each do |r|
-  name = r["name"]
-  name = "opentox-" + name unless name =~ /opentox-/
-  parse(r["url"]+"/issues").each do |i|
-    task = Todo::Task.new "#{name} #{i["title"]} #{i["html_url"]}"
-    @list.push task unless @list.include? task
+  unless r["name"] =~ /opentox-ruby|validation/
+    parse(r["url"]+"/issues").each do |i|
+      task = {:uuid => SecureRandom.uuid}
+      task.parse ["+#{r["name"]}", " #{i["title"]} #{i["html_url"]}"]
+      task[:description].strip!
+      @list << task unless @list.collect{|t| t[:description]}.include? task[:description]
+    end
   end
 end
-@list.save
+save

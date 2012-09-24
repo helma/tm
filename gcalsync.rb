@@ -1,35 +1,43 @@
 #!/usr/bin/env ruby
-require 'date'
+
 require File.join(File.dirname(__FILE__),"todo.rb")
 
-TRANSLATE = [
-  ["toxbank", "ToxBank"],
-  ["nanotox", "ModNanoTox"]
-]
+class Hash
+  def self.from_gcal line
+    task = {}
+    items = line.split("\t")
+    task[:uuid] = SecureRandom.uuid
+    task[:description] = items[3]
+    task[:description] += " " + items[1] unless items[1] == "00:00"
+    task[:tags] = []
+    task[:due] = Date.parse items[0] 
+    case items[3]
+    when /ToxBank/i
+      task[:tags] << "toxbank"
+    when /ModNanoTox/i
+      task[:tags] << "nanotox"
+    when /BMBF/i
+      task[:tags] << "bmbf"
+    end
+    task
+  end
 
-def from_gcal line
-  items = line.split("\t")
-  str = items[3]
-  TRANSLATE.each{ |tr| str.gsub!(/#{tr.last}/,"+#{tr.first}") }
-  str += " due:" + items[0] 
-  str += " " + items[1] unless items[1] == "00:00"
-  Todo::Task.new str
-end
-
-def to_gcal task
-  str = task.text.gsub(/\+/, '').gsub(/due:/, '').gsub(/t:\d{4}-\d{2}-\d{2}/, '').gsub(/@\w+/, '')
-  TRANSLATE.each{ |tr| str.gsub!(/#{tr.first}/,"#{tr.last}") }
-  str
+=begin
+  def to_gcal task
+    str = task.text.gsub(/\+/, '').gsub(/due:/, '').gsub(/t:\d{4}-\d{2}-\d{2}/, '').gsub(/@\w+/, '')
+    TRANSLATE.each{ |tr| str.gsub!(/#{tr.first}/,"#{tr.last}") }
+    str
+  end
+=end
 end
 
 # import
-#gcal = []
+
 `gcalcli --tsv agenda #{Date.today} #{Date.today+365}`.each_line do |line|
-  task = from_gcal line
-  #gcal << task 
-  @list.push task unless @list.include? task
+  task = Hash.from_gcal line
+  @list << task unless @list.collect{|t| t[:description]}.include? task[:description]
 end
-@list.save
+save
 
 =begin
 # export

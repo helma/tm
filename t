@@ -26,7 +26,9 @@ else
     if ARGV.size == 1
       run :punch
     else
-      run "modify"
+      tasks = ARGV.grep /^\d+$/
+      args = ARGV - tasks
+      tasks.each { |t| puts `modify.rb #{t} #{args.join(" ")}` }
     end
   when /^\w+$/ 
     action = ARGV.shift.to_sym
