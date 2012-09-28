@@ -13,11 +13,10 @@ end
 parse("https://api.github.com/users/opentox/repos").each do |r|
   unless r["name"] =~ /opentox-ruby|validation/
     parse(r["url"]+"/issues").each do |i|
-      task = {:uuid => SecureRandom.uuid}
-      task.parse ["+#{r["name"]}", " #{i["title"]} #{i["html_url"]}"]
+      task = Task.new ["+#{r["name"]}", " #{i["title"]} #{i["html_url"]}"]
       task[:description].strip!
       @list << task unless @list.collect{|t| t[:description]}.include? task[:description]
     end
   end
 end
-save
+@list.save TODO

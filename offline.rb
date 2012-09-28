@@ -10,4 +10,4 @@ elsif ARGV.size == 3 # add duration
 end
 task[:offline] ||= {}
 task[:offline][date] = ARGV[1].to_f*3600
-save
+@list.save TODO

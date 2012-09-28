@@ -1,8 +1,19 @@
 #!/usr/bin/env ruby
 
 require File.join(File.dirname(__FILE__),"todo.rb")
-task = @list[ARGV.first.to_i]
-dep = @list[ARGV.last.to_i]
-task[:dependencies] ||= []
-task[:dependencies] << dep[:uuid]
-save
+ARGV.each_with_index do |id,idx|
+  print id
+  unless idx >= ARGV.size - 1
+    before = @list[id.to_i]
+    after = @list[ARGV[idx+1].to_i]
+    before[:before] ||= []
+    before[:before] << after[:uuid]
+    before[:before].uniq!
+    after[:after] ||= []
+    after[:after] << before[:uuid]
+    after[:after].uniq!
+    print " -> "
+  end
+end
+puts
+@list.save TODO

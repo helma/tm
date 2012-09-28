@@ -10,5 +10,5 @@ elsif ARGV.first =~ /\d+/
   File.open(tmpfile, "w+"){|f| f.puts task.to_yaml}
   `xterm -e vim #{tmpfile}`
   @list[ARGV.last.to_i] = YAML.load_file tmpfile
-  save
+  @list.save TODO
 end

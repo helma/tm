@@ -1,10 +1,14 @@
 #!/usr/bin/env ruby
 
 require File.join(File.dirname(__FILE__),"todo.rb")
-@deleted = YAML.load_file DELETED
-to_delete = ARGV.collect { |i| @list[i.to_i] }
-to_delete.each{|task| task[:deleted] = Date.today}
-@list -= to_delete
-@deleted += to_delete
-to_delete.each{|task| print "Deleted: "; task.print @deleted}
-save
+@deleted = Array.read DELETED
+ARGV.each do |i|
+  task = @list[i.to_i]
+  task[:deleted] = Date.today
+  print "Deleted: "
+  @list.print task
+  @deleted << task
+end
+(@list & @deleted).each{|t| @list.delete t}
+@list.save TODO
+@deleted.save DELETED

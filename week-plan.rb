@@ -16,9 +16,5 @@ tasks = []
   tasks << "evening mental training s:#{n} e:30 +mind"
 end
 
-tasks.each do |t|
-  task = {:uuid => SecureRandom.uuid}
-  task.parse t.split(/\s+/)
-  @list << task
-end
-save
+tasks.each{ |t| @list << Task.new t.split(/\s+/) }
+@list.save TODO

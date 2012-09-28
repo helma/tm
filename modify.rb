@@ -3,6 +3,6 @@
 require File.join(File.dirname(__FILE__),"todo.rb")
 task = @list[ARGV.shift.to_i]
 task.parse ARGV
-save
+@list.save TODO
 print "Modified: "
-task.print @list
+@list.print task

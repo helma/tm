@@ -1,14 +1,14 @@
 #!/usr/bin/env ruby
 
 require File.join(File.dirname(__FILE__),"todo.rb")
+@done = Array.read DONE
 
-class Hash
+class Task
   def self.from_gcal line
-    task = {}
+    task = Task.new
     items = line.split("\t")
-    task[:uuid] = SecureRandom.uuid
     task[:description] = items[3]
-    task[:description] += " " + items[1] unless items[1] == "00:00"
+    task[:description] += " " + items[1] + "-" + items[2] unless items[1] == "00:00"
     task[:tags] = []
     task[:due] = Date.parse items[0] 
     case items[3]
@@ -34,10 +34,10 @@ end
 # import
 
 `gcalcli --tsv agenda #{Date.today} #{Date.today+365}`.each_line do |line|
-  task = Hash.from_gcal line
-  @list << task unless @list.collect{|t| t[:description]}.include? task[:description]
+  task = Task.from_gcal line
+  @list << task unless (@done+@list).collect{|t| t[:description]}.include? task[:description]
 end
-save
+@list.save TODO
 
 =begin
 # export

@@ -1,9 +1,9 @@
 #!/usr/bin/env ruby
 
 require File.join(File.dirname(__FILE__),"todo.rb")
-task = {:uuid => SecureRandom.uuid}
-task.parse ARGV
+
+task = Task.new ARGV
 @list << task
-save
+@list.save TODO
 print "Added: "
-task.print @list
+@list.print task
