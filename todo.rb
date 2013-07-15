@@ -13,7 +13,9 @@ TODO_DIR = "#{ENV["HOME"]}/.todo"
 TODO = File.join TODO_DIR, "todo.yaml"
 DONE = File.join TODO_DIR, "done.yaml"
 DELETED = File.join TODO_DIR, "deleted.yaml"
+RECURRENT = File.join TODO_DIR, "recurrent.yaml"
 CURRENT = File.join TODO_DIR, "current"
+DESCRIPTION = File.join TODO_DIR, "description"
 
 class Float
   def to_m
@@ -24,7 +26,7 @@ class Float
     hr,r = self.divmod 3600
     "#{hr}:#{format '%02d', (r/60).round}h"
   end
-  def to_time
+  def to_datetime
     self > 3600.0 ? self.to_h : self.to_m
   end
 end
@@ -40,24 +42,34 @@ end
 def print_day date
   @list ||= Array.read TODO
   @done ||= Array.read DONE
+  @deleted ||= Array.read DELETED
+
+  YAML.load_file(RECURRENT).each do |taskstr,dates|
+    if dates.include? date.wday #and !@deleted.select{|t| t[:scheduled] == date and t[:description] == taskstr}.empty?
+      task = Task.new(taskstr.split(" "))
+      task[:scheduled] = date.to_datetime
+      @list << task if (@done+@list).select{|t| t.scheduled_at?(date) and t[:description] == task[:description]}.empty?
+    end
+  end
+  @list.save TODO
 
   not_scheduled = (@list+@done).select{|t| t.day_dur(date) > 0.0 and !t.scheduled_at? date}
   all_stat = Stat.new not_scheduled, date, date#[@list,@done]
   done_stat = Stat.new @done, date, date
   todo_stat = Stat.new @list, date, date
 
-  puts yellow("#{(date).strftime('%a %d %b %Y')} w#{todo_stat[:work][:planned].to_f.to_time}/f#{todo_stat[:not_work][:planned].to_f.to_time}/t#{todo_stat[:total][:planned].to_f.to_time}")
-  @list.each{|t| @list.print t if t[:scheduled] == date}
+  puts yellow("#{(date).strftime('%a %d %b %Y')} w#{todo_stat[:work][:planned].to_f.to_datetime}/f#{todo_stat[:not_work][:planned].to_f.to_datetime}/t#{todo_stat[:total][:planned].to_f.to_datetime}")
+  @list.each{|t| @list.print t if t[:scheduled] and t[:scheduled].to_date == date}
 
   if date == Date.today
-    puts blue("  Done: w#{done_stat[:work][:measured].to_f.to_time}/f#{done_stat[:not_work][:measured].to_f.to_time}/t#{done_stat[:total][:measured].to_f.to_time}")
+    puts blue("  Done: w#{done_stat[:work][:measured].to_f.to_datetime}/f#{done_stat[:not_work][:measured].to_f.to_datetime}/t#{done_stat[:total][:measured].to_f.to_datetime}")
     @done.each do |t|
       if t[:finished] == date
         print "  "
         @done.print t
       end
     end
-    puts cyan("  Not scheduled: w#{all_stat[:work][:measured].to_f.to_time}/f#{all_stat[:not_work][:measured].to_f.to_time}/t#{all_stat[:total][:measured].to_f.to_time}")
+    puts cyan("  Not scheduled: w#{all_stat[:work][:measured].to_f.to_datetime}/f#{all_stat[:not_work][:measured].to_f.to_datetime}/t#{all_stat[:total][:measured].to_f.to_datetime}")
     @list.each do |t|
       unless t.day_dur(date) == 0.0 or t.scheduled_at? date
         print "  "
@@ -82,10 +94,7 @@ class Array
   def self.read file
     list = YAML.load_file file
     list.file = file
-    list.each do |t|
-      t.sanitize
-      
-    end
+    list.each { |t| t.sanitize }
     list.prioritize
   end
 
@@ -101,20 +110,18 @@ class Array
 
   def prioritize
     sort do |a,b|
-      as = a[:schduled] 
+      as = a[:scheduled] 
       bs = b[:scheduled]
       as ||= a[:due]
       bs ||= b[:due]
-      as ||= Date.today+3650
-      bs ||= Date.today+3650
+      as ||= (Date.today+3650).to_datetime
+      bs ||= (Date.today+3650).to_datetime
       as <=> bs
     end.tsort
   end
 
   def print task
     str = "%03d" % self.index(task)
-    #if task == current 
-      #prefix = " * " 
     if task.node? and task.after(self).nil?
       prefix = " * "
     elsif task.sink?
@@ -126,32 +133,31 @@ class Array
     end
     str += prefix
     str += task[:description]
-    if task[:scheduled]
+    if task[:due]
       case task.date_diff
       when 0
-        str+= " (today)"
+        str+= " (today "
       when 1
-        str+= " (tomorrow)"
+        str+= " (tomorrow "
       else
-        str += " (#{task.date_diff} days)"
+        str += " (#{task.date_diff} days "
       end
+      str += task[:due].to_s.split("T").last.split(":")[0..1].join(":")+")"
     end
     str += " "
-    str += "#{task.total_dur.to_time}/" #unless task.total_dur == 0
-    str += "#{task[:expected_duration].to_f.to_time}" #if task[:expected_duration]
+    str += "#{task.total_dur.to_datetime}/" 
+    str += "#{task[:expected_duration].to_f.to_datetime}" 
     task[:tags].each{|t| str += " +#{t}"}
     
     if task.after self
-      #dependencies = collect{|t| index t if task[:after].include?(t[:uuid])}.compact.join(", ")
       dependencies = task.after(self).collect{|t| index t}
       str += " <- #{dependencies}"
     end
     if task[:before]
-      #dependencies = collect{|t| index t if task[:before].include?(t[:uuid])}.compact.join(", ")
       dependencies = task.before(self).collect{|t| index t}
       str += " -> #{dependencies}"
     end
-    str = red str if task.overdue?
+    str = red str if task[:due]#task.overdue?
     if task.today?
       task[:expected_duration] ? str = green(str) : str = cyan(str)
     end
@@ -161,7 +167,6 @@ class Array
     tags = collect{|t| t[:tags]}.flatten.uniq.sort 
     work = tags - not_work
     str = bold str if !task[:tags].empty? and (task[:tags] & work).empty?
-    #str = negative str if !task[:tags].empty? and !(task[:tags] & not_computer).empty?
     str = on_blue str if !task[:tags].empty? and !(task[:tags] & not_computer).empty?
     str = underline str if task[:due]
     str = negative str if task == current
@@ -206,16 +211,16 @@ class Task < Hash
       self[:scheduled] = self[:due] if self[:due] and !self[:scheduled]
     else
       self[:scheduled] = self[:due] if self[:due] and !self[:scheduled]
-      self[:scheduled] = Date.today if overdue? or (self[:scheduled] and self[:scheduled] < Date.today)
+      self[:scheduled] = DateTime.now if overdue? or (self[:scheduled] and self[:scheduled] < DateTime.now)
     end
   end
 
   def overdue?
-    self[:due] and self[:due] < Date.today
+    self[:due] and self[:due] < DateTime.now
   end
 
   def scheduled_at? date
-    self[:scheduled] and self[:scheduled] == date
+    self[:scheduled] and self[:scheduled].to_date == date
   end
 
   def today?
@@ -223,11 +228,11 @@ class Task < Hash
   end
 
   def next?
-    self[:due] and self[:due] > Date.today
+    self[:due] and self[:due].to_date > Date.today
   end
 
   def date_diff
-    (self[:scheduled] - Date.today).to_i if self[:scheduled]
+    (self[:due].to_date - Date.today).to_i if self[:due]
   end
 
   def total_dur
@@ -247,10 +252,10 @@ class Task < Hash
     Time.now - self[:punch].last.first if self[:punch] and self[:punch].last.size == 1
   end
   
-  def day_dur date
+  def day_dur date, end_date=date
     dur = 0.0
     self[:punch].each do |punch|
-      if punch.first.to_date == date
+      if punch.first.to_date >= date and punch.first.to_date <= end_date
         if punch.size == 2
           dur += punch.last - punch.first
         elsif punch.size == 1
@@ -281,12 +286,6 @@ class Task < Hash
     end
   end
 
-  def blocked?
-  end
-
-  def blocks
-  end
-
   def node?
     self[:after] or self[:before]
   end
@@ -296,18 +295,20 @@ class Task < Hash
   end
 
   def print
-    puts "#{current_dur.to_time} #{self[:description]}"
+    puts "#{current_dur.to_datetime} #{self[:description]}"
   end
 
   def punchout
     self[:punch].last << Time.now
     File.open(CURRENT,"w+"){|f| f.print ""} 
+    File.open(DESCRIPTION,"w+"){|f| f.print ""} 
   end
 
   def punchin 
     self[:punch] ||= []
     self[:punch] << [Time.now]
     File.open(CURRENT,"w+"){|f| f.print self[:uuid]}
+    File.open(DESCRIPTION,"w+"){|f| f.print self[:description]} 
   end
 
   def parse args
@@ -328,19 +329,16 @@ class Task < Hash
     self[:tags] += tags.collect{|t| t.sub(/^\+/,'')}
     self[:tags] -= untags.collect{|t| t.sub(/^-/,'')}
     annotations.each do |a|
-      k,v = a.split ':'
+      k,v = a.split ':', 2
       k = shortcuts[k.to_sym] if shortcuts.keys.include? k.to_sym
       case k.to_s
       when /scheduled|due/
         case v.to_s
         when /\d{4}-\d{2}-\d{2}/
-          v = Date.parse v
+          v = DateTime.parse(v+" +02:00")
         when /\d+/
-          v = Date.today + v.to_i
-        #when "-"
-          #v = nil
+          v = DateTime.now + v.to_i
         when ""
-          #v = Date.today
           v = nil
         end
       when "expected_duration"
@@ -355,8 +353,6 @@ end
 
 class Stat < Hash
 
-  attr_accessor :time
-
   def initialize lists, start=Date.today, finish=Date.today
     @list = lists.flatten
     @tags = @list.collect{|t| t[:tags]}.flatten.uniq.sort 
@@ -367,7 +363,6 @@ class Stat < Hash
       @list.each do |t|
         measured = t.day_dur(day)
         planned = t.expected_dur day
-        #puts planned, t,inspect unless planned == 0.0
         self[:total][:planned] += planned
         self[:total][:measured] += measured
         if (t[:tags] & @work).empty?
@@ -380,6 +375,8 @@ class Stat < Hash
         t[:tags].each do |tag|
           self[tag.to_sym][:planned] += planned
           self[tag.to_sym][:measured] += measured
+          self[tag.to_sym][:finished] ||= 0
+          self[tag.to_sym][:finished] += 1 if t[:finished] == day
         end
         if t[:tags].empty?
           self[:none][:planned] += planned
