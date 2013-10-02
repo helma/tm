@@ -3,46 +3,37 @@
 require File.join(File.dirname(__FILE__),"todo.rb")
 @done = Array.read DONE
 
-class Task
-  def self.from_gcal line
-    task = Task.new
-    items = line.split("\t")
-    task[:description] = items[3]
-    task[:description] += " " + items[1] + "-" + items[2] unless items[1] == "00:00"
-    task[:tags] = []
-    task[:due] = Date.parse items[0] 
-    case items[3]
-    when /ToxBank/i
-      task[:tags] << "toxbank"
-    when /ModNanoTox/i
-      task[:tags] << "nanotox"
-    when /BMBF/i
-      task[:tags] << "bmbf"
+@google = []
+@new = []
+`google -u christophhelma calendar list --date #{Date.today.to_s},#{Date.today.year}-12-31 --delimiter "\t" --cal ".*"`.each_line do |line|
+  line.chomp!
+  case line
+  when /^\[/
+    @cal = line.gsub(/[\[\]]/,'')
+  when ""
+  else
+    next if @cal == "Deutsche Feiertage"
+    @description,time = line.split("\t")
+    @time = time.split(" - ")
+    @time.collect! do |t|
+      month,day,time = t.split " "
+      h,m = time.split ":"
+      Time.local Date.today.year,month,day,h,m
     end
-    task
+    tasks = (@done+@list).select{|t| t[:due] and t[:description] == @description and t[:due] == @time.first }
+    task = Task.new
+    task[:description] = @description
+    task[:tags] = [@cal.downcase]
+    task[:due] = @time.first if @time and @time.first
+    @google << task 
+    @new << task if tasks.size == 0
   end
-
-=begin
-  def to_gcal task
-    str = task.text.gsub(/\+/, '').gsub(/due:/, '').gsub(/t:\d{4}-\d{2}-\d{2}/, '').gsub(/@\w+/, '')
-    TRANSLATE.each{ |tr| str.gsub!(/#{tr.first}/,"#{tr.last}") }
-    str
-  end
-=end
 end
-
-# import
-
-`gcalcli --tsv agenda #{Date.today} #{Date.today+365}`.each_line do |line|
-  task = Task.from_gcal line
-  @list << task unless (@done+@list).collect{|t| t[:description]}.include? task[:description]
-end
+@list += @new
 @list.save TODO
 
-=begin
 # export
-@list.select{|t| t.due_date}.each do |task|
-  puts "gcalcli quick #{to_gcal(task)}" unless gcal.collect{|t| t.orig}.include? task.orig
-  #`gcalcli quick #{to_gcal(task)}` unless gcal.collect{|t| t.orig}.include? task.orig
+@list.select{|t| t[:due]}.each do |task|
+  dups = @google.select{|t|  t[:description] == task[:description] and t[:due] == task[:due]}.size
+  `google -u christophhelma --cal 'helma@in-silico.ch' add '#{task[:description]} #{task[:due]}'` if dups.size == 0
 end
-=end

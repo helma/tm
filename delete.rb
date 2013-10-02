@@ -1,14 +1,23 @@
 #!/usr/bin/env ruby
+require_relative "todo.rb"
 
-require File.join(File.dirname(__FILE__),"todo.rb")
 @deleted = Array.read DELETED
-ARGV.each do |i|
-  task = @list[i.to_i]
-  task[:deleted] = Date.today
-  print "Deleted: "
-  @list.print task
-  @deleted << task
+
+if ARGV.empty? 
+  del = [@list.current]
+else
+  del = ARGV.collect { |i| @list[i.to_i] }
 end
-(@list & @deleted).each{|t| @list.delete t}
+
+@list.current.punchout if @list.current and del.include? @list.current
+del.each do |task|
+  task[:deleted] = Date.today
+  @deleted << task
+  @list.delete task
+  print "Deleted: "
+  @deleted.print task
+end
 @list.save TODO
 @deleted.save DELETED
+#print_day Date.today
+

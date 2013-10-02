@@ -44,6 +44,7 @@ def print_day date
   @done ||= Array.read DONE
   @deleted ||= Array.read DELETED
 
+=begin
   YAML.load_file(RECURRENT).each do |taskstr,dates|
     if dates.include? date.wday #and !@deleted.select{|t| t[:scheduled] == date and t[:description] == taskstr}.empty?
       task = Task.new(taskstr.split(" "))
@@ -52,6 +53,7 @@ def print_day date
     end
   end
   @list.save TODO
+=end
 
   not_scheduled = (@list+@done).select{|t| t.day_dur(date) > 0.0 and !t.scheduled_at? date}
   all_stat = Stat.new not_scheduled, date, date#[@list,@done]
@@ -69,7 +71,7 @@ def print_day date
         @done.print t
       end
     end
-    puts cyan("  Not scheduled: w#{all_stat[:work][:measured].to_f.to_datetime}/f#{all_stat[:not_work][:measured].to_f.to_datetime}/t#{all_stat[:total][:measured].to_f.to_datetime}")
+    #puts cyan("  Not scheduled: w#{all_stat[:work][:measured].to_f.to_datetime}/f#{all_stat[:not_work][:measured].to_f.to_datetime}/t#{all_stat[:total][:measured].to_f.to_datetime}")
     @list.each do |t|
       unless t.day_dur(date) == 0.0 or t.scheduled_at? date
         print "  "
@@ -114,8 +116,8 @@ class Array
       bs = b[:scheduled]
       as ||= a[:due]
       bs ||= b[:due]
-      as ||= (Date.today+3650).to_datetime
-      bs ||= (Date.today+3650).to_datetime
+      as ||= (Date.today+3650).to_time
+      bs ||= (Date.today+3650).to_time
       as <=> bs
     end.tsort
   end
@@ -132,7 +134,7 @@ class Array
       prefix = " "
     end
     str += prefix
-    str += task[:description]
+    str += task[:description] if task[:description]
     if task[:due]
       case task.date_diff
       when 0
@@ -164,7 +166,7 @@ class Array
     if task[:scheduled]
       task[:expected_duration] ? str = blue(str) : str = cyan(str)
     end
-    tags = collect{|t| t[:tags]}.flatten.uniq.sort 
+    tags = collect{|t| t[:tags]}.flatten.uniq.compact.sort 
     work = tags - not_work
     str = bold str if !task[:tags].empty? and (task[:tags] & work).empty?
     str = on_blue str if !task[:tags].empty? and !(task[:tags] & not_computer).empty?
@@ -207,20 +209,28 @@ class Task < Hash
   end
 
   def sanitize
+    self[:due] = self[:due].to_time if self[:due].is_a? DateTime
+    self[:due] = self[:due].to_time if self[:due].is_a? Date
+    self[:due] = DateTime.parse(self[:due]).to_time if self[:due].is_a? String
+    self[:scheduled] = self[:scheduled].to_time if self[:scheduled].is_a? DateTime
+    self[:scheduled] = self[:scheduled].to_time if self[:scheduled].is_a? Date
+    self[:scheduled] = DateTime.parse(self[:scheduled]).to_time if self[:scheduled].is_a? String
     if self[:finished]
       self[:scheduled] = self[:due] if self[:due] and !self[:scheduled]
     else
       self[:scheduled] = self[:due] if self[:due] and !self[:scheduled]
-      self[:scheduled] = DateTime.now if overdue? or (self[:scheduled] and self[:scheduled] < DateTime.now)
+      self[:scheduled] = Time.now if overdue? or (self[:scheduled] and self[:scheduled] < Time.now)
     end
+    self[:tags] -= ["INBOX","NEXT","ARCHIVE"] if self[:due] or self[:scheduled]
+
   end
 
   def overdue?
-    self[:due] and self[:due] < DateTime.now
+    self[:due] and self[:due] < Time.now
   end
 
   def scheduled_at? date
-    self[:scheduled] and self[:scheduled].to_date == date
+    self[:scheduled] and self[:scheduled] == date.to_time
   end
 
   def today?
@@ -228,11 +238,12 @@ class Task < Hash
   end
 
   def next?
-    self[:due] and self[:due].to_date > Date.today
+    self[:due] and self[:due] > Time.now
   end
 
   def date_diff
-    (self[:due].to_date - Date.today).to_i if self[:due]
+    #(self[:due] - Time.now).to_i if self[:due]
+    ((self[:due] - Time.now)/(24*60*60)).to_i if self[:due]
   end
 
   def total_dur
@@ -241,7 +252,7 @@ class Task < Hash
       if d.size == 2
         dur += d.last - d.first
       elsif d.size == 1
-        dur += Time.now - d.first 
+        dur += Time.new - d.first 
       end
     end if self[:punch] 
     self[:offline].each{|d,t| dur += t} if self[:offline]
@@ -316,18 +327,23 @@ class Task < Hash
       :e => :expected_duration,
       :s => :scheduled,
       :d => :due,
+      :u => :uri
     }
     tags = args.grep(/^\+/)
     args -= tags
+    tags.collect!{|t| t.sub(/^\+/,'')}
     untags = args.grep(/^-/)
     args -= untags
+    untags.collect!{|t| t.sub(/^-/,'')}
+    sort_tags = tags & ["INBOX","NEXT","ARCHIVE"]
+    untags += ["INBOX","NEXT","ARCHIVE"] - sort_tags
     annotations = args.grep(/^[a-z]+:/)
     args -= annotations
-    self[:added] = Date.today if self.empty?
+    self[:added] = Time.now if self.empty?
     self[:description] = args.join(" ") unless args.empty?
     self[:tags] ||= []
-    self[:tags] += tags.collect{|t| t.sub(/^\+/,'')}
-    self[:tags] -= untags.collect{|t| t.sub(/^-/,'')}
+    self[:tags] += tags
+    self[:tags] -= untags
     annotations.each do |a|
       k,v = a.split ':', 2
       k = shortcuts[k.to_sym] if shortcuts.keys.include? k.to_sym
@@ -335,9 +351,10 @@ class Task < Hash
       when /scheduled|due/
         case v.to_s
         when /\d{4}-\d{2}-\d{2}/
-          v = DateTime.parse(v+" +02:00")
+          y,m,d = v.to_s.split "-"
+          v = Time.new y,m,d
         when /\d+/
-          v = DateTime.now + v.to_i
+          v = (DateTime.now + v.to_i).to_time
         when ""
           v = nil
         end
