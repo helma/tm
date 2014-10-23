@@ -7,4 +7,4 @@ task.parse ARGV
 @list.prioritize
 print "Modified: "
 @list.print task
-print_day Date.today
+#print_day Date.today

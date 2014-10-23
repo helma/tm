@@ -16,6 +16,7 @@ DELETED = File.join TODO_DIR, "deleted.yaml"
 RECURRENT = File.join TODO_DIR, "recurrent.yaml"
 CURRENT = File.join TODO_DIR, "current"
 DESCRIPTION = File.join TODO_DIR, "description"
+SCHEDULE_TAGS = ["INBOX","NEXT","LATER","ARCHIVE"]
 
 class Float
   def to_m
@@ -31,13 +32,13 @@ class Float
   end
 end
 
-def not_work
-  YAML.load_file File.join(TODO_DIR,"not-work.yaml")
-end
+#def not_work
+#  YAML.load_file File.join(TODO_DIR,"not-work.yaml")
+#end
 
-def not_computer
-  YAML.load_file File.join(TODO_DIR,"not-computer.yaml")
-end
+#def not_computer
+  #YAML.load_file File.join(TODO_DIR,"not-computer.yaml")
+#end
 
 def print_day date
   @list ||= Array.read TODO
@@ -161,15 +162,18 @@ class Array
     end
     str = red str if task[:due]#task.overdue?
     if task.today?
-      task[:expected_duration] ? str = green(str) : str = cyan(str)
+      #task[:expected_duration] ? str = green(str) : str = cyan(str)
     end
     if task[:scheduled]
-      task[:expected_duration] ? str = blue(str) : str = cyan(str)
+      #task[:expected_duration] ? str = blue(str) : str = cyan(str)
     end
     tags = collect{|t| t[:tags]}.flatten.uniq.compact.sort 
-    work = tags - not_work
-    str = bold str if !task[:tags].empty? and (task[:tags] & work).empty?
-    str = on_blue str if !task[:tags].empty? and !(task[:tags] & not_computer).empty?
+    #work = tags - not_work
+    #work = tags - ["work"]
+    str = on_red str if task[:tags].include? "work"
+    str = green str if !task[:tags].empty? and !(task[:tags] & ["social","art","pr","climbing","regeneration"]).empty?
+    #str = bold str if !task[:tags].empty? and (task[:tags] & work).empty?
+    #str = on_blue str if !task[:tags].empty? and !(task[:tags] & not_computer).empty?
     str = underline str if task[:due]
     str = negative str if task == current
     puts "  "+str
@@ -221,7 +225,7 @@ class Task < Hash
       self[:scheduled] = self[:due] if self[:due] and !self[:scheduled]
       self[:scheduled] = Time.now if overdue? or (self[:scheduled] and self[:scheduled] < Time.now)
     end
-    self[:tags] -= ["INBOX","NEXT","ARCHIVE"] if self[:due] or self[:scheduled]
+    self[:tags] -= SCHEDULE_TAGS if self[:due] or self[:scheduled]
 
   end
 
@@ -335,8 +339,8 @@ class Task < Hash
     untags = args.grep(/^-/)
     args -= untags
     untags.collect!{|t| t.sub(/^-/,'')}
-    sort_tags = tags & ["INBOX","NEXT","ARCHIVE"]
-    untags += ["INBOX","NEXT","ARCHIVE"] - sort_tags
+    sort_tags = tags & SCHEDULE_TAGS
+    untags += SCHEDULE_TAGS - sort_tags
     annotations = args.grep(/^[a-z]+:/)
     args -= annotations
     self[:added] = Time.now if self.empty?
@@ -373,7 +377,8 @@ class Stat < Hash
   def initialize lists, start=Date.today, finish=Date.today
     @list = lists.flatten
     @tags = @list.collect{|t| t[:tags]}.flatten.uniq.sort 
-    @work = @tags - not_work
+    #@work = @tags - not_work
+    @work = @tags - ["work"]
     @tags += [:none,:work,:not_work,:total]
     @tags.each{ |t| self[t.to_sym] = {:planned => 0.0, :measured => 0.0} }
     (start..finish).each do |day|
@@ -406,7 +411,7 @@ class Stat < Hash
   def session_dur
     punch = []
     @list.each do |t|
-      t[:punch].each{|p| punch << p } if t[:punch] and !t[:tags].empty? and (t[:tags] & not_computer).empty?
+      t[:punch].each{|p| punch << p } if t[:punch] #and !t[:tags].empty? and (t[:tags] & not_computer).empty?
     end
     punch.sort!{|a,b| a.first <=> b.first}
     punch.last[1] = Time.now if punch.last.size == 1
